@@ -161,5 +161,82 @@ class Linear(Module):
         # So, dL/dX = grad_output @ W
         # Shape check: (N, out_features) @ (out_features, in_features) -> (N, in_features), which matches the input's shape
         grad_input = grad_output @ self.W
-        
+
         return grad_input
+    
+class Sequential(Module):
+    """
+    A sequential container. Modules will be added to it in the order they 
+    are passed in the constructor
+
+    Example:
+    model = Sequential(
+        Linear(in_features=2, out_features=10),
+        ReLU(),
+        Linear(in_features=10, out_features=2)
+    )
+    """
+    def __init__(self, *layers) :
+        """
+        Args: 
+            *layers: A sequence of Module objects to be stacked.
+        """
+        super().__init__()
+        self.layers = list(layers)
+
+    def forward(self, X: np.ndarray) -> np.ndarray:
+        """
+        Passes the input through all layers sequentially.
+
+        Args:
+            X (np.ndarray): The initial input to the first layer.
+
+        Returns:
+            np.ndarray: The final output after last layer.
+        """
+        current_input = X
+        for layer in self.layers:
+            # the output of the one layer is input to the next 
+            current_input = layer(current_input)
+        # the final output of the sequence is the output of the last layer
+        return current_input
+    
+    def backward(self, grad_output: np.ndarray) -> np.ndarray:
+        """
+        Performs backpropagation through all layers in reverse order.
+
+        Args:
+            np.ndarray: the gradient w.r.t the initial input.
+                        (though this is often not used for the full model)
+        """
+        current_grad_output = grad_output
+        for layer in reversed(self.layers):
+            # the input gradients for one layer is the output gradient from the next
+             current_grad_output = layer.backward(current_grad_output)
+        return current_grad_output
+
+    def parameters(self) -> list:
+        """
+        Collects and returns all parameters from all sub-modules
+        """
+        all_params = []
+        for layer in self.layers:
+            # list.extend adds all elements of an iterable to the list 
+            all_params.extend(layer.parameters())
+        return all_params
+    
+    def gradients(self) -> list:
+        """
+        Collects and returns all gradients from all the sub-modules
+        """
+        all_grads = []
+        for layer in self.layers:
+            all_grads.extend(layer.gradients())
+        return all_grads
+    
+    def zero_grad(self):
+        """
+        Calls zero_grad() on all sub-modules to reset their gradients
+        """
+        for layer in self.layers:
+            layer.zero_grad()
