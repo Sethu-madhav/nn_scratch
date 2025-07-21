@@ -164,6 +164,99 @@ class Linear(Module):
 
         return grad_input
     
+class ReLU(Module):
+    """
+    Applies the Rectified Linear Unit function element-wise
+    ReLU(x) = max(0, x)
+    """
+    def __init__(self):
+        super().__init__()
+        # we need to cache the input for the backward pass
+        self.input = None
+    
+    def forward(self, X: np.ndarray) -> np.ndarray:
+        """
+        Applies the ReLU function
+
+        Args:
+            X (np.ndarray): the input data from the previous layer 
+        
+        Returns:
+            np.ndarray: the input with negative values clamped to zero
+        """
+        # cache the input for the backward pass
+        self._input = X
+        # np.maximum calculates the element-wise maximum
+        return np.maximum(0, self._input)
+    
+    def backward(self, grad_output: np.ndarray) -> np.ndarray:
+        """
+        Computes the gradient of the loss w.r.t the input of ReLU.
+
+        Args: 
+            grad_output (np.ndarray): The gradient from the next layer (dL/dY)
+                                      shape is the same as the input
+        
+        Returns:
+            np.ndarray: the gradient w.r.t the input (dL/dX)
+        """
+        # The chain rule is: dL/dX = dL/dY * dY/dX
+        # The derivative of ReLU is:
+        # -1 if x > 0
+        # -0 if x <= 0
+
+        # create a mask for where the input was positive 
+        # (self._input > 0) returns a boolean array (True/False)
+        # Multiplying by 1 turns it into a binary array (1/0)
+        relu_grad = (self._input > 0) * 1
+
+        # Apply chain rule: multiply the upstream gradient by the local gradient 
+        # This will pass the gradient through where the original input was positive,
+        # and block it (makes it zero) where the original input was negative
+        return grad_output * relu_grad
+    
+class Sigmoid(Module):
+    """
+    Applies the sigmoid function element-wise
+    Sigmoid(x) = 1 / (1 + exp(-x))
+    """
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, X: np.ndarray) -> np.ndarray:
+        """
+        Applies the sigmoid function
+
+        Args:
+            X (np.ndarray): The input data
+        
+        Returns:
+            np.ndarray: The input squashed between 0 and 1
+        """
+        # the output of sigmoid is calculated and stored in self._output
+        # by the parent class's __call__ method
+        return 1 / (1 + np.exp(-X))
+    
+    def backward(self, grad_output: np.ndarray) -> np.ndarray:
+        """
+        Computes the gradient of the loss w.r.t the input of sigmoid 
+        Args:
+            grad_output (np.ndarray): The gradient from the next layer (dL/dY)
+        Returns:
+            np.ndarray: The gradient w.r.t the input (dL/dX)
+        """
+        # The chain rule is: dL/dX = dL/dY * dY/dX
+        # The derivative of the sigmoid function, dY/dX, can be written 
+        # very elegantly in terms of its output, Y: Y * (1 - Y)
+        
+        # self._output was cached by the Modules __call__ method
+        sigmoid_output = self._output
+        sigmoid_grad = sigmoid_output * (1 - sigmoid_output)
+        
+        # Apply chain rule
+        return grad_output * sigmoid_grad
+
+
 class Sequential(Module):
     """
     A sequential container. Modules will be added to it in the order they 
