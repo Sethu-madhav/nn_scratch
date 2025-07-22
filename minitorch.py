@@ -333,3 +333,59 @@ class Sequential(Module):
         """
         for layer in self.layers:
             layer.zero_grad()
+
+class MSELoss(Module):
+    """
+    Computes the Mean Squared Error loss.
+    This is commonly used for regression tasks 
+    """
+    def __init__(self) :
+        super().__init__() 
+        # Cache the predictions and true values for the backward pass
+        self._y_pred = None
+        self._y_true = None
+    
+    def forward(self, y_pred: np.ndarray, y_true: np.ndarray) -> float:
+        """
+        Calculates the mean squared error loss
+        L = (1/N) * Σ(y_pred - y_true)^2
+
+        Args:
+            y_pred (np.ndarray): The predictions from the model. Shape (N, D),
+                                Where N is batch size and D is output dimension.
+            y_true (np.ndarray): The ground-truth values. shape (N, D)
+        
+        Returns: 
+            float: A single scalar value representing the loss
+        """
+        # Cache values needed for the backward pass
+        self._y_pred = y_pred
+        self._y_true = y_true
+
+        # Number of samples in the batch
+        num_samples = y_pred.shape[0]
+
+        # Calculate the loss
+        loss = np.sum((y_pred - y_true)**2) / num_samples
+        return loss
+    
+    def backward(self) -> np.ndarray:
+        """
+        Computes the gradient of the MSE loss w.r.t the predictions.
+        This is the first gradient in the backpropagation chain.
+
+        Returns:
+            np.ndarray: The gradient of the loss w.r.t y_pred (dL/dy_pred)
+                        Shape will be the same as y_pred
+        """
+        # The derivative of the loss L w.r.t a single prediction y_pred_i is:
+        # dL/dy_pred_i = d/dy_pred_i [ (1/N) * Σ(y_pred_j - y_true_j)^2 ]
+        #              = (1/N) * 2 * (y_pred_i - y_true_i)
+
+        # Number of samples in the batch
+        num_samples = self._y_pred.shape[0]
+
+        # Calculate the gradient
+        grad_y_pred = 2 * (self._y_pred - self._y_true) / num_samples
+
+        return grad_y_pred
