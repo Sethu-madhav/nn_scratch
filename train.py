@@ -70,7 +70,7 @@ for epoch in range(num_epochs):
 
     # 3. Calculate the loss
     # compare the predictions with the true values
-    loss = loss_fn.forward(y_pred, y_train)
+    loss = loss_fn(y_pred, y_train)
 
     # 4. Backward pass
     # First get the intital gradient from the loss function
@@ -89,7 +89,7 @@ print("\nTraining finished.")
 
 # 4. Visualize the results
 print("\nStep 4: Visualizing the results")
-final_predictions = model.forward(X_train)
+final_predictions = model(X_train)
 
 print(f"y_train: {y_train[:5, :]}")
 print(f"final_pred: {final_predictions[:5, :]}")
