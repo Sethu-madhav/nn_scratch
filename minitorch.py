@@ -52,7 +52,7 @@ class Module:
         for i in range(len(self._gradients)):
             self._gradients[i].fill(0.0)
 
-    def __call__(self, *args: np.Any, **kwargs: np.Any) -> np.Any:
+    def __call__(self, *args, **kwargs) :
         """
         Makes the module callable (e.g. layer(input))
         """
@@ -64,7 +64,7 @@ class Linear(Module):
     Applies a linear transformation to the incoming data: y = xA^T + B.
     This module is our equivalent of torch.nn.Linear
     """
-    def __init__(self, in_features: int, out_features: int, bias: bool = True) :
+    def __init__(self, in_features: int, out_features: int, bias: bool = True, dtype: np.dtype = np.float32) :
         """
         Args:
             in_features: size of each input sample
@@ -82,7 +82,7 @@ class Linear(Module):
         # it helps with training stability.
         # the shape is (out, in) to match Pytorch's convention
         stdv = np.sqrt(2. / self.in_features)
-        self.W = np.random.uniform(-stdv, stdv, (self.out_features, self.in_features))
+        self.W = np.random.uniform(-stdv, stdv, (self.out_features, self.in_features)).astype(dtype)
 
         # store the W parameter in the Module's parameter list
         self._parameters.append(self.W)
@@ -92,7 +92,7 @@ class Linear(Module):
 
         if self.use_bias:
             # biases can be intialized to zero
-            self.b = np.zeros((1, self.out_features))
+            self.b = np.zeros((1, self.out_features), dtype=dtype)
             self._parameters.append(self.b)
             # create corresponding gradient tensor
             self.gb = np.zeros_like(self.b)
@@ -172,7 +172,7 @@ class ReLU(Module):
     def __init__(self):
         super().__init__()
         # we need to cache the input for the backward pass
-        self.input = None
+        self._input = None
     
     def forward(self, X: np.ndarray) -> np.ndarray:
         """
@@ -202,7 +202,7 @@ class ReLU(Module):
         """
         # The chain rule is: dL/dX = dL/dY * dY/dX
         # The derivative of ReLU is:
-        # -1 if x > 0
+        # 1 if x > 0
         # -0 if x <= 0
 
         # create a mask for where the input was positive 
@@ -421,7 +421,5 @@ class SGD:
         It itereates through all parameters and updates them using their gradients
         """
         # Iterates over all the parameters and their corresponding gradients
-        for i in range(len(self.params)):
-            # updates the parameter in-place using the SGD rule 
-            # we use =- to modify the numpy array directly
-            self.params[i] -= (self.lr * self.grads[i])
+        for param, grad in zip(self.params, self.grads):
+            param -= self.lr * grad
