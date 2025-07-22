@@ -389,3 +389,39 @@ class MSELoss(Module):
         grad_y_pred = 2 * (self._y_pred - self._y_true) / num_samples
 
         return grad_y_pred
+
+class SGD:
+    """
+    Implements the Stochastic gradient descent (SGD) optimizer.
+    It updates the parameters using the rule:
+    param = param - (learning_rate * gradient)
+    """
+    def __init__(self, parameters: list, gradients: list, lr: float = 0.001) :
+        """
+        Initializes the optimizer.
+
+        Args: 
+            parameters (list): A list of model's parameters to be updated.
+                               (e.g. from model.parameters())
+            gradients (list) : A list of the corresponding gradients.
+                               (e.g. from model.gradients())
+            lr (float) : Learning rate. Default: 0.001
+        """
+        # Ensure that number of parameters matches the number of gradients
+        if len(parameters) != len(gradients):
+            raise ValueError("The number of parameters and gradients must be the same.")
+        
+        self.params = parameters
+        self.grads = gradients
+        self.lr = lr
+
+    def step(self):
+        """
+        Performs a single optimization step
+        It itereates through all parameters and updates them using their gradients
+        """
+        # Iterates over all the parameters and their corresponding gradients
+        for i in range(len(self.params)):
+            # updates the parameter in-place using the SGD rule 
+            # we use =- to modify the numpy array directly
+            self.params[i] -= (self.lr * self.grads[i])
