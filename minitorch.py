@@ -1,4 +1,5 @@
 import numpy as np
+from engine import xp, to_device, get_device, is_on_gpu
 
 class Module:
     """
@@ -13,6 +14,45 @@ class Module:
         self._parameters = []
         # we wil store their corresponding gradients here
         self._gradients = []
+        # by default all modules are intitalized on the CPU
+        self._device = 'cpu'
+    
+    # A property to get the device
+    @property
+    def device(self):
+        """
+        Returns the device the module's parameters are on.
+        """
+        return self._device
+    
+    def to(self, device: str):
+        """
+        Moves the module and its parameters to the specified device ('cpu', 'cuda')
+
+        Args: 
+            device (str): The target device
+        
+        Returns: 
+            Module: self, to allow for chaining (e.g. model= Model().to('cuda'))
+        """
+        # 1. Validate the target device string
+        self._device = get_device(device)
+
+        # 2. Move all parameters
+        for i, param in enumerate(self._parameters):
+            # to_device handles conversion between numpy and cupy
+            self._parameters[i] = to_device(param, device=device)
+
+        # 3. Move all gradients
+        for i, grad in enumerate(self._gradients):
+            self._gradients[i] = to_device(grad, device=device)
+
+        # 4. For Sequential moduels, we must also move the sub-layers
+        if hasattr(self, 'layers'):
+            for layer in self.layers:
+                layer.to(self._device)
+
+        return self
     
     def forward(self, *args, **kwargs):
         """
@@ -64,7 +104,7 @@ class Linear(Module):
     Applies a linear transformation to the incoming data: y = xA^T + B.
     This module is our equivalent of torch.nn.Linear
     """
-    def __init__(self, in_features: int, out_features: int, bias: bool = True, dtype: np.dtype = np.float32) :
+    def __init__(self, in_features: int, out_features: int, bias: bool = True, dtype: np.dtype = xp.float32) :
         """
         Args:
             in_features: size of each input sample
@@ -81,21 +121,21 @@ class Linear(Module):
         # we use a common initialization scheme (kaiming He) for the weights.
         # it helps with training stability.
         # the shape is (out, in) to match Pytorch's convention
-        stdv = np.sqrt(2. / self.in_features)
-        self.W = np.random.uniform(-stdv, stdv, (self.out_features, self.in_features)).astype(dtype)
+        stdv = float(xp.sqrt(2. / self.in_features))
+        self.W = xp.random.uniform(-stdv, stdv, (self.out_features, self.in_features)).astype(dtype)
 
         # store the W parameter in the Module's parameter list
         self._parameters.append(self.W)
         # create a corresponding gradient tensor, initialized to zeros
-        self.gW = np.zeros_like(self.W)
+        self.gW = xp.zeros_like(self.W)
         self._gradients.append(self.gW)
 
         if self.use_bias:
             # biases can be intialized to zero
-            self.b = np.zeros((1, self.out_features), dtype=dtype)
+            self.b = xp.zeros((1, self.out_features), dtype=dtype)
             self._parameters.append(self.b)
             # create corresponding gradient tensor
-            self.gb = np.zeros_like(self.b)
+            self.gb = xp.zeros_like(self.b)
             self._gradients.append(self.gb)
         
         # we need to cache the input for the backward pass
@@ -145,7 +185,7 @@ class Linear(Module):
             # Sum the gradients for each sample in the batch
             # grad_output shape: (N, out_features) -> gb shape: (1, out_features) 
             # We update the gradient in-place
-            self.gb[:] = np.sum(grad_output, axis=0, keepdims=True)
+            self.gb[:] = xp.sum(grad_output, axis=0, keepdims=True)
 
         # 2. Calcualte the gradient w.r.t the weights (dL/dW)
         # Using the chain rule: dL/dW = dL/dY * dY/dW
@@ -187,7 +227,7 @@ class ReLU(Module):
         # cache the input for the backward pass
         self._input = X
         # np.maximum calculates the element-wise maximum
-        return np.maximum(0, self._input)
+        return xp.maximum(0, self._input)
     
     def backward(self, grad_output: np.ndarray) -> np.ndarray:
         """
@@ -235,7 +275,7 @@ class Sigmoid(Module):
         """
         # the output of sigmoid is calculated and stored in self._output
         # by the parent class's __call__ method
-        return 1 / (1 + np.exp(-X))
+        return 1 / (1 + xp.exp(-X))
     
     def backward(self, grad_output: np.ndarray) -> np.ndarray:
         """
@@ -366,8 +406,8 @@ class MSELoss(Module):
         num_samples = y_pred.shape[0]
 
         # Calculate the loss
-        loss = np.sum((y_pred - y_true)**2) / num_samples
-        return loss
+        loss = xp.sum((y_pred - y_true)**2) / num_samples
+        return loss.item()
     
     def backward(self) -> np.ndarray:
         """

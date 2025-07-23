@@ -2,16 +2,24 @@ import numpy as np
 import matplotlib.pyplot as plt
 # import all classes we built in our library
 from minitorch import Linear, ReLU, SGD, Sequential, MSELoss, Module
+from engine import xp, to_device, get_device
+
+# 0. Choose Device
+# Try setting this to 'cuda' if you have a Nvidia GPU!
+# device_str = 'cpu'
+device_str = 'cuda'
+device = get_device(device_str)
+print(f"Training on device: {device}")
 
 # 1. Prepare the data
 # Goal: learn the function y = 2x + 1
 print("\nStep 1: Preparing the data")
-np.random.seed(42)
-DTYPE = np.float32
+np.random.seed(41)
+DTYPE = np.float64
 
 # Create out training data (X) and target values (Y)
 # we  create 100 data points for x from -5 to 5
-X_train = np.linspace(-5, 5, 100, dtype=DTYPE).reshape(-1, 1) # Shape: (100, 1)
+X_train = np.linspace(-5, 5, 90000, dtype=DTYPE).reshape(-1, 1) # Shape: (100, 1)
 
 # The true function is y = 2x + 1
 # We add some random noise to make the task more realistic
@@ -42,8 +50,16 @@ model = Sequential(
     Linear(in_features=hidden_size, out_features=1, dtype=DTYPE)
 )
 
-print("Model created:")
-print(model)
+# Move the model to the selected device
+print(f"Moving model to '{device}'...")
+model.to(device)
+# If device is 'cuda'. we can check this:
+print(f"Model is on device: '{model.device}'")
+if device == 'cuda':
+    # The fist parameter's type should be a cupy.ndarray
+    first_param = model.parameters()[0]
+    print(f"Type of first model parameter: {type(first_param)}")
+
 
 # Define the loss function
 loss_fn = MSELoss()
@@ -59,6 +75,12 @@ print(f"Optimizer: SGD with learning rate {learning_rate}")
 print("\nStep 3: Starting the training loop")
 
 num_epochs = 5000
+# Move the dataset to the device 
+print(f"Moving training data to the device...")
+X_train = to_device(X_train, device=device)
+y_train = to_device(y_train, device=device)
+print(f"Type of X_train on device: {type(X_train)}")
+
 for epoch in range(num_epochs):
 
     # 1. Zero Gradients
@@ -89,7 +111,13 @@ print("\nTraining finished.")
 
 # 4. Visualize the results
 print("\nStep 4: Visualizing the results")
-final_predictions = model(X_train)
+# moving data back to CPU 
+final_predictions_gpu = model(X_train)
+final_predictions = to_device(final_predictions_gpu, device='cpu')
+
+# Convert X_train and y_train back to CPU for plotting
+X_train = to_device(X_train, device='cpu')
+y_train = to_device(y_train, device='cpu')
 
 print(f"y_train: {y_train[:5, :]}")
 print(f"final_pred: {final_predictions[:5, :]}")
